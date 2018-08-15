@@ -16,12 +16,12 @@ import com.google.common.collect.ImmutableClassToInstanceMap.Builder;
 import com.google.common.util.concurrent.CheckedFuture;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
+import org.opendaylight.controller.md.sal.common.api.MappingCheckedFuture;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncTransaction;
 import org.opendaylight.controller.md.sal.common.api.data.DataStoreUnavailableException;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
@@ -41,7 +41,6 @@ import org.opendaylight.controller.md.sal.dom.api.DOMDataTreeIdentifier;
 import org.opendaylight.controller.md.sal.dom.api.DOMDataWriteTransaction;
 import org.opendaylight.controller.md.sal.dom.api.DOMTransactionChain;
 import org.opendaylight.mdsal.common.api.CommitInfo;
-import org.opendaylight.mdsal.common.api.MappingCheckedFuture;
 import org.opendaylight.mdsal.dom.api.DOMDataTreeReadTransaction;
 import org.opendaylight.mdsal.dom.api.DOMDataTreeReadWriteTransaction;
 import org.opendaylight.mdsal.dom.api.DOMDataTreeWriteTransaction;
@@ -246,9 +245,8 @@ public class LegacyDOMDataBrokerAdapter extends ForwardingObject implements DOMD
         @Override
         public CheckedFuture<Optional<NormalizedNode<?, ?>>, ReadFailedException> read(LogicalDatastoreType store,
                 YangInstanceIdentifier path) {
-            return MappingCheckedFuture.create(readDelegate().read(convert(store), path).transformAsync(
-                optional -> Futures.immediateFuture(Optional.fromJavaUtil(optional)), MoreExecutors.directExecutor()),
-                ReadFailedExceptionAdapter.INSTANCE);
+            return MappingCheckedFuture.create(readDelegate().read(convert(store), path).transform(
+                Optional::fromJavaUtil, MoreExecutors.directExecutor()), ReadFailedExceptionAdapter.INSTANCE);
         }
 
         @Override

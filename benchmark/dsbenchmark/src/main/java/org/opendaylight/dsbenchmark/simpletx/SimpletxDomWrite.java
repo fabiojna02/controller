@@ -9,12 +9,12 @@
 package org.opendaylight.dsbenchmark.simpletx;
 
 import java.util.List;
-import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
-import org.opendaylight.controller.md.sal.common.api.data.TransactionCommitFailedException;
-import org.opendaylight.controller.md.sal.dom.api.DOMDataBroker;
-import org.opendaylight.controller.md.sal.dom.api.DOMDataWriteTransaction;
+import java.util.concurrent.ExecutionException;
 import org.opendaylight.dsbenchmark.DatastoreAbstractWriter;
 import org.opendaylight.dsbenchmark.DomListBuilder;
+import org.opendaylight.mdsal.common.api.LogicalDatastoreType;
+import org.opendaylight.mdsal.dom.api.DOMDataBroker;
+import org.opendaylight.mdsal.dom.api.DOMDataTreeWriteTransaction;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.dsbenchmark.rev150105.StartTestInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.dsbenchmark.rev150105.StartTestInput.DataStore;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.dsbenchmark.rev150105.TestExec;
@@ -31,7 +31,7 @@ public class SimpletxDomWrite extends DatastoreAbstractWriter {
     private List<MapEntryNode> list;
 
     public SimpletxDomWrite(final DOMDataBroker domDataBroker, final StartTestInput.Operation oper,
-                                    final int outerListElem, final int innerListElem, final long putsPerTx, final DataStore dataStore ) {
+            final int outerListElem, final int innerListElem, final long putsPerTx, final DataStore dataStore) {
         super(oper, outerListElem, innerListElem, putsPerTx, dataStore);
         this.domDataBroker = domDataBroker;
         LOG.debug("Created SimpletxDomWrite");
@@ -48,7 +48,7 @@ public class SimpletxDomWrite extends DatastoreAbstractWriter {
         final YangInstanceIdentifier pid =
                 YangInstanceIdentifier.builder().node(TestExec.QNAME).node(OuterList.QNAME).build();
 
-        DOMDataWriteTransaction tx = domDataBroker.newWriteOnlyTransaction();
+        DOMDataTreeWriteTransaction tx = domDataBroker.newWriteOnlyTransaction();
         long writeCnt = 0;
 
         for (MapEntryNode element : this.list) {
@@ -65,9 +65,9 @@ public class SimpletxDomWrite extends DatastoreAbstractWriter {
 
             if (writeCnt == writesPerTx) {
                 try {
-                    tx.submit().checkedGet();
+                    tx.commit().get();
                     txOk++;
-                } catch (final TransactionCommitFailedException e) {
+                } catch (final InterruptedException | ExecutionException e) {
                     LOG.error("Transaction failed", e);
                     txError++;
                 }
@@ -78,12 +78,10 @@ public class SimpletxDomWrite extends DatastoreAbstractWriter {
 
         if (writeCnt != 0) {
             try {
-                tx.submit().checkedGet();
-            } catch (final TransactionCommitFailedException e) {
+                tx.commit().get();
+            } catch (final InterruptedException | ExecutionException e) {
                 LOG.error("Transaction failed", e);
             }
         }
-
     }
-
 }

@@ -5,12 +5,10 @@
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
  */
-
 package org.opendaylight.dsbenchmark;
 
 import java.util.Random;
-
-import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
+import org.opendaylight.mdsal.common.api.LogicalDatastoreType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.dsbenchmark.rev150105.StartTestInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.dsbenchmark.rev150105.StartTestInput.DataStore;
 import org.slf4j.Logger;
@@ -26,13 +24,11 @@ public abstract class DatastoreAbstractWriter {
     protected final StartTestInput.DataStore dataStore;
     protected final Random rn = new Random();
 
-
     protected int txOk = 0;
     protected int txError = 0;
 
-
     public DatastoreAbstractWriter(final StartTestInput.Operation oper,
-                                   final int outerListElem, final int innerListElem, final long writesPerTx, final DataStore dataStore) {
+            final int outerListElem, final int innerListElem, final long writesPerTx, final DataStore dataStore) {
         this.outerListElem = outerListElem;
         this.innerListElem = innerListElem;
         this.writesPerTx = writesPerTx;
