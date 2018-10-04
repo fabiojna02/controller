@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import org.opendaylight.controller.md.sal.common.api.MappingCheckedFuture;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncTransaction;
@@ -27,6 +28,7 @@ import org.opendaylight.controller.md.sal.common.api.data.DataStoreUnavailableEx
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.md.sal.common.api.data.OptimisticLockFailedException;
 import org.opendaylight.controller.md.sal.common.api.data.ReadFailedException;
+import org.opendaylight.controller.md.sal.common.api.data.TransactionChainClosedException;
 import org.opendaylight.controller.md.sal.common.api.data.TransactionChainListener;
 import org.opendaylight.controller.md.sal.common.api.data.TransactionCommitFailedException;
 import org.opendaylight.controller.md.sal.dom.api.ClusteredDOMDataTreeChangeListener;
@@ -102,8 +104,8 @@ public class LegacyDOMDataBrokerAdapter extends ForwardingObject implements DOMD
 
                     final ListenerRegistration<org.opendaylight.mdsal.dom.api.DOMDataTreeChangeListener> reg =
                         delegateTreeChangeService.registerDataTreeChangeListener(
-                            new org.opendaylight.mdsal.dom.api.DOMDataTreeIdentifier(convert(treeId.getDatastoreType()),
-                                    treeId.getRootIdentifier()), delegateListener);
+                            new org.opendaylight.mdsal.dom.api.DOMDataTreeIdentifier(
+                                treeId.getDatastoreType().toMdsal(), treeId.getRootIdentifier()), delegateListener);
 
                     return new ListenerRegistration<L>() {
                         @Override
@@ -180,17 +182,17 @@ public class LegacyDOMDataBrokerAdapter extends ForwardingObject implements DOMD
         legacyChain.set(new DOMTransactionChain() {
             @Override
             public DOMDataReadOnlyTransaction newReadOnlyTransaction() {
-                return new DOMDataReadOnlyTransactionAdapter(delegateChain.newReadOnlyTransaction());
+                return new DOMDataReadOnlyTransactionAdapter(wrapException(delegateChain::newReadOnlyTransaction));
             }
 
             @Override
             public DOMDataReadWriteTransaction newReadWriteTransaction() {
-                return new DOMDataTransactionAdapter(delegateChain.newReadWriteTransaction());
+                return new DOMDataTransactionAdapter(wrapException(delegateChain::newReadWriteTransaction));
             }
 
             @Override
             public DOMDataWriteTransaction newWriteOnlyTransaction() {
-                return new DOMDataTransactionAdapter(delegateChain.newWriteOnlyTransaction());
+                return new DOMDataTransactionAdapter(wrapException(delegateChain::newWriteOnlyTransaction));
             }
 
             @Override
@@ -202,8 +204,12 @@ public class LegacyDOMDataBrokerAdapter extends ForwardingObject implements DOMD
         return legacyChain.get();
     }
 
-    private static org.opendaylight.mdsal.common.api.LogicalDatastoreType convert(LogicalDatastoreType datastoreType) {
-        return org.opendaylight.mdsal.common.api.LogicalDatastoreType.valueOf(datastoreType.name());
+    static <T> T wrapException(final Supplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (org.opendaylight.mdsal.common.api.TransactionChainClosedException e) {
+            throw new TransactionChainClosedException("Transaction chain already closed", e);
+        }
     }
 
     private static class DOMDataTransactionAdapter implements DOMDataReadWriteTransaction {
@@ -245,30 +251,30 @@ public class LegacyDOMDataBrokerAdapter extends ForwardingObject implements DOMD
         @Override
         public CheckedFuture<Optional<NormalizedNode<?, ?>>, ReadFailedException> read(LogicalDatastoreType store,
                 YangInstanceIdentifier path) {
-            return MappingCheckedFuture.create(readDelegate().read(convert(store), path).transform(
+            return MappingCheckedFuture.create(readDelegate().read(store.toMdsal(), path).transform(
                 Optional::fromJavaUtil, MoreExecutors.directExecutor()), ReadFailedExceptionAdapter.INSTANCE);
         }
 
         @Override
         public CheckedFuture<Boolean, ReadFailedException> exists(LogicalDatastoreType store,
                 YangInstanceIdentifier path) {
-            return MappingCheckedFuture.create(readDelegate().exists(convert(store), path),
+            return MappingCheckedFuture.create(readDelegate().exists(store.toMdsal(), path),
                     ReadFailedExceptionAdapter.INSTANCE);
         }
 
         @Override
         public void delete(LogicalDatastoreType store, YangInstanceIdentifier path) {
-            writeDelegate().delete(convert(store), path);
+            writeDelegate().delete(store.toMdsal(), path);
         }
 
         @Override
         public void put(LogicalDatastoreType store, YangInstanceIdentifier path, NormalizedNode<?, ?> data) {
-            writeDelegate().put(convert(store), path, data);
+            writeDelegate().put(store.toMdsal(), path, data);
         }
 
         @Override
         public void merge(LogicalDatastoreType store, YangInstanceIdentifier path, NormalizedNode<?, ?> data) {
-            writeDelegate().merge(convert(store), path, data);
+            writeDelegate().merge(store.toMdsal(), path, data);
         }
 
         @Override
